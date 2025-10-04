@@ -16,6 +16,8 @@ density:
   content_chars: 300
   batch_size: 64
   window_hours: 24
+  deduplicate: true
+  deduplication_threshold: 0.92
 summarizer:
   model: "openrouter/auto"
   temperature: 0.2

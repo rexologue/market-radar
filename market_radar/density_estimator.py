@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 import numpy as np
 
 from .config import DensityConfig
 from .models import Article
+
+if TYPE_CHECKING:
+    from .progress import StageHandle
 
 
 def clean_text(text: Optional[str]) -> str:
@@ -70,7 +73,7 @@ def encode_texts(
     title_score: float,
     content_score: float,
     batch_size: int,
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
     titles_prep = [("passage: " + t) if t else "" for t in titles]
     contents_prep = [("passage: " + c) if c else "" for c in contents]
 
@@ -97,7 +100,7 @@ def encode_texts(
     combined = (w_t * e_title + w_c * e_content) / w_sum
     norms = np.linalg.norm(combined, axis=1, keepdims=True)
     norms = np.maximum(norms, 1e-12)
-    return combined / norms
+    return combined / norms, e_title
 
 
 def bucket_key(dt: datetime) -> str:
@@ -168,6 +171,7 @@ class DensityEstimator:
     def __init__(self, config: DensityConfig) -> None:
         self.config = config
         self._model = None
+        self._title_embeddings: Optional[np.ndarray] = None
 
     def _ensure_model(self):
         if self._model is None:
@@ -175,15 +179,20 @@ class DensityEstimator:
             self._model = get_model(self.config.model_id, cache_dir)
         return self._model
 
-    def estimate(self, articles: Sequence[Article]) -> Dict[int, float]:
+    def estimate(
+        self,
+        articles: Sequence[Article],
+        stage: Optional["StageHandle"] = None,
+    ) -> Dict[int, float]:
         if not articles:
+            self._title_embeddings = None
             return {}
 
         model = self._ensure_model()
         titles = [clean_text(art.title) for art in articles]
         contents = [lead(art.content, self.config.content_chars) for art in articles]
 
-        embeddings = encode_texts(
+        embeddings, title_embeddings = encode_texts(
             model=model,
             titles=titles,
             contents=contents,
@@ -191,12 +200,24 @@ class DensityEstimator:
             content_score=self.config.content_score,
             batch_size=self.config.batch_size,
         )
+        self._title_embeddings = title_embeddings
 
         groups = group_by_window(articles, self.config.window_hours)
         values: Dict[int, float] = {}
+        if stage is not None:
+            stage.set_total(len(articles))
+            processed = 0
         for _, idxs in groups.items():
             values.update(compute_window_scores(idxs, articles, embeddings))
+            if stage is not None:
+                processed += len(idxs)
+                stage.advance(len(idxs))
+        if stage is not None and processed < len(articles):
+            stage.advance(len(articles) - processed)
         return values
+
+    def get_title_embeddings(self) -> Optional[np.ndarray]:
+        return self._title_embeddings
 
 
 __all__ = ["DensityEstimator"]
