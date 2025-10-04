@@ -24,23 +24,27 @@ class StageHandle:
     task_id: TaskID
     description: str
     completed: bool = False
+    total: Optional[float] = None
+    completed_amount: float = 0.0
 
     def set_total(self, total: Optional[int]) -> None:
+        self.total = float(total) if total is not None else None
         self.progress._progress.update(self.task_id, total=total)
 
     def advance(self, amount: int = 1) -> None:
         if self.completed:
             return
+        self.completed_amount += amount
         self.progress._progress.advance(self.task_id, amount)
 
     def complete(self) -> None:
         if self.completed:
             return
-        task = self.progress._progress.get_task(self.task_id)
         remaining = 0.0
-        if task.total is not None:
-            remaining = max(task.total - task.completed, 0.0)
+        if self.total is not None:
+            remaining = max(self.total - self.completed_amount, 0.0)
         if remaining:
+            self.completed_amount += remaining
             self.progress._progress.advance(self.task_id, remaining)
         self.progress._progress.remove_task(self.task_id)
         self.progress._on_stage_complete()
@@ -93,7 +97,12 @@ class PipelineProgress:
                 description=f"Pipeline • {description}",
             )
         task_id = self._progress.add_task(description, total=total)
-        handle = StageHandle(progress=self, task_id=task_id, description=description)
+        handle = StageHandle(
+            progress=self,
+            task_id=task_id,
+            description=description,
+            total=float(total) if total is not None else None,
+        )
         self._active_stage = handle
         return handle
 
