@@ -89,6 +89,66 @@ the generated JSON report. 【F:examples/run_pipeline.py†L1-L38】
 python examples/run_pipeline.py --config config.yaml
 ```
 
+## HTTP API
+
+The project ships with a FastAPI wrapper that exposes the pipeline over HTTP.
+It accepts query parameters to override key configuration values on demand and
+returns the ranked articles as JSON.
+
+### Run locally
+
+```bash
+uvicorn market_radar.api:create_app --factory --host 0.0.0.0 --port 8000
+```
+
+Send a request to trigger the pipeline:
+
+```bash
+curl "http://localhost:8000/pipeline?config_path=$(pwd)/config.yaml&since=6h&limit=10"
+```
+
+Available query parameters:
+
+- `config_path` – path to the YAML configuration (defaults to
+  `MARKET_RADAR_CONFIG` env var or `config.yaml`).
+- `since` – override `time_window.since` (e.g. `6h`).
+- `max_per_source` – limit the number of articles pulled per RSS source.
+- `limit` – trim the number of records returned in the JSON response.
+- `sources_path` – override the RSS sources JSON used by the fetcher.
+- `output_path` – specify a custom location for the generated report on disk.
+
+Set `MARKET_RADAR_MODEL_CACHE` (or the common `HF_HOME`/`TRANSFORMERS_CACHE`)
+to reuse a persistent cache for Sentence Transformers weights.
+
+### Container image
+
+The repository includes a [`Dockerfile`](./Dockerfile) and helper script for
+building and running the API in a container. To start the service with your
+configuration mounted read-only and the Hugging Face cache persisted on the
+host, execute:
+
+```bash
+PORT=8000 \
+CONFIG_PATH=~/market-radar/config.yaml \
+MODELS_DIR=~/.cache/huggingface \
+./tools/run_api_container.sh
+```
+
+Important environment variables:
+
+- `CONFIG_PATH` – path to the YAML config mounted into the container.
+- `SOURCES_PATH` – optional path to a custom `sources.json` file.
+- `MODELS_DIR` – directory on the host reused as the Hugging Face cache to
+  avoid model re-downloads.
+- `OPENROUTER_API_KEY` – forwarded to the container when present so the
+  summariser can reach OpenRouter.
+- `DO_BUILD=1` – build the Docker image before running it.
+- `DEV=1` – mount the repository into `/app` for live-editing inside the
+  container.
+
+The FastAPI app listens on the port specified via the `PORT` environment
+variable (default `8000`).
+
 ## Deployment notes
 
 - **Secrets & credentials** – Store the OpenRouter API key and any feed
