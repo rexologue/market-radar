@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Sequence
+from typing import Optional, Sequence, TYPE_CHECKING
 
 from .config import HotnessConfig
 from .models import Article
 
+if TYPE_CHECKING:
+    from .progress import StageHandle
 
 class HotnessCalculator:
     """Calculate time, density and domain weighted hotness."""
@@ -36,9 +38,15 @@ class HotnessCalculator:
             return 0.0
         return (value - tail) / (1.0 - tail)
 
-    def apply(self, articles: Sequence[Article]) -> None:
+    def apply(
+        self,
+        articles: Sequence[Article],
+        stage: Optional["StageHandle"] = None,
+    ) -> None:
         weights = self.config.weights
         scores = []
+        if stage is not None:
+            stage.set_total(len(articles))
         for art in articles:
             art.time_coef = self.time_coef(art)
             density = art.density_coef or 0.0
@@ -51,6 +59,8 @@ class HotnessCalculator:
             )
             art.hotness = score
             scores.append(score)
+            if stage is not None:
+                stage.advance(1)
 
         if not scores:
             return

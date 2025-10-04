@@ -41,6 +41,8 @@ class DensityConfig:
     content_chars: int = 300
     batch_size: int = 64
     window_hours: int = 24
+    deduplicate: bool = True
+    deduplication_threshold: float = 0.92
 
 
 @dataclass

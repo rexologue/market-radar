@@ -5,12 +5,15 @@ from __future__ import annotations
 import os
 import re
 import time
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
 import httpx
 
 from .config import SummarizerConfig
 from .models import Article
+
+if TYPE_CHECKING:
+    from .progress import StageHandle
 
 CATS: Dict[str, float] = {
     "регуляторика/санкции/правовые риски": 1.0,
@@ -124,9 +127,17 @@ class Summarizer:
         article.domain_coef = weight
         return category, weight
 
-    def summarize(self, articles: Sequence[Article]) -> None:
+    def summarize(
+        self,
+        articles: Sequence[Article],
+        stage: Optional["StageHandle"] = None,
+    ) -> None:
+        if stage is not None:
+            stage.set_total(len(articles))
         for article in articles:
             self.summarize_article(article)
+            if stage is not None:
+                stage.advance(1)
 
 
 __all__ = ["Summarizer"]
