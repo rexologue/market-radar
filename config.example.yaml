@@ -1,9 +1,9 @@
 time_window:
-  since: "6h"
+  since: "24h"
 fetcher:
   sources_path: "sources.json"
-  min_chars: 400
-  max_per_source: 200
+  min_chars: 100
+  max_per_source: 1000
   concurrency: 8
   timeout: 30
   user_agent: "market-radar/1.0"
