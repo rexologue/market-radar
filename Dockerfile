@@ -20,8 +20,7 @@ RUN pip install --upgrade pip \
 
 COPY . .
 
-ENV MARKET_RADAR_CONFIG=/app/config.yaml \
-    MARKET_RADAR_MODEL_CACHE=/app/models \
+ENV MARKET_RADAR_MODEL_CACHE=/app/models \
     HF_HOME=/app/models \
     TRANSFORMERS_CACHE=/app/models \
     SENTENCE_TRANSFORMERS_HOME=/app/models \
@@ -29,4 +28,5 @@ ENV MARKET_RADAR_CONFIG=/app/config.yaml \
 
 EXPOSE 8000
 
-CMD ["python", "-m", "market_radar"]
+ENTRYPOINT ["python", "-m", "market_radar"]
+CMD ["--config", "/app/config.yaml"]

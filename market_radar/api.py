@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,8 @@ from .orchestrator import NewsPipelineOrchestrator
 DEFAULT_CONFIG_ENV = "MARKET_RADAR_CONFIG"
 DEFAULT_CONFIG_FALLBACK = "config.example.yaml"
 MODEL_CACHE_ENV = "MARKET_RADAR_MODEL_CACHE"
+
+_DEFAULT_CONFIG_PATH: Path | None = None
 
 
 class ArticlePayload(BaseModel):
@@ -41,19 +43,24 @@ class PipelineResponse(BaseModel):
     articles: List[ArticlePayload] = Field(..., description="Ranked articles with coefficients")
 
 
-def create_app() -> FastAPI:
+def configure_default_config_path(path: Path | str) -> None:
+    """Set the default configuration file path used by the API factory."""
+
+    global _DEFAULT_CONFIG_PATH
+    _DEFAULT_CONFIG_PATH = Path(path).expanduser()
+
+
+def create_app(config_path: Path | str | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
 
-    default_config_path = Path(
-        os.getenv(DEFAULT_CONFIG_ENV, DEFAULT_CONFIG_FALLBACK)
-    ).expanduser()
+    default_config_path = _determine_config_path(config_path)
 
     app = FastAPI(
         title="Market Radar API",
         version="1.0.0",
         description=(
-            "HTTP wrapper for the Market Radar pipeline. Provide overrides via query "
-            "parameters to adjust the execution on the fly."
+            "HTTP wrapper for the Market Radar pipeline. Runtime overrides are limited "
+            "to the 'since' window and required output destination."
         ),
     )
 
@@ -69,34 +76,13 @@ def create_app() -> FastAPI:
         response_model=PipelineResponse,
     )
     async def run_pipeline(
-        config_file: Optional[UploadFile] = File(
-            None,
-            description=(
-                "Upload a YAML configuration file. When omitted the default "
-                "config.example.yaml (or MARKET_RADAR_CONFIG) is used."
-            ),
-        ),
         since: Optional[str] = Query(
             None,
             description="Override the time window 'since' value, e.g. '6h'",
         ),
-        max_per_source: Optional[int] = Query(
-            None,
-            ge=1,
-            description="Limit the number of articles pulled per source",
-        ),
-        limit: Optional[int] = Query(
-            None,
-            ge=1,
-            description="Trim the number of articles returned in the response",
-        ),
-        sources_path: Optional[str] = Query(
-            None,
-            description="Override the sources JSON path used by the fetcher",
-        ),
-        output_path: Optional[str] = Query(
-            None,
-            description="Override the destination JSON file written by the pipeline",
+        output_path: str = Query(
+            ...,
+            description="Destination JSON file written by the pipeline",
         ),
     ) -> PipelineResponse:
         """Execute the pipeline with optional overrides and return the ranked articles."""
@@ -104,12 +90,8 @@ def create_app() -> FastAPI:
         try:
             response = await run_in_threadpool(
                 _execute_pipeline,
-                config_file,
                 default_config_path,
                 since,
-                max_per_source,
-                limit,
-                sources_path,
                 output_path,
             )
         except FileNotFoundError as exc:  # pragma: no cover - simple mapping
@@ -125,29 +107,23 @@ def create_app() -> FastAPI:
 
 
 def _execute_pipeline(
-    config_upload: Optional[UploadFile],
     default_config_path: Path,
     since: Optional[str],
-    max_per_source: Optional[int],
-    limit: Optional[int],
-    sources_path: Optional[str],
-    output_path: Optional[str],
+    output_path: str,
 ) -> PipelineResponse:
     """Load configuration, apply overrides, and run the pipeline synchronously."""
 
-    config = _load_config(config_upload, default_config_path)
+    config = _load_config(default_config_path)
 
     if since:
         config.time_window.since = since
 
-    if max_per_source is not None:
-        config.fetcher.max_per_source = max_per_source
+    if not output_path:
+        raise ValueError("The 'output_path' query parameter is required")
 
-    if sources_path:
-        config.fetcher.sources_path = _validate_path(sources_path, "sources file")
-
-    if output_path:
-        config.output.path = _ensure_parent(_validate_path(output_path, "output file", must_exist=False))
+    config.output.path = _ensure_parent(
+        _validate_path(output_path, "output file", must_exist=False)
+    )
 
     model_cache = os.getenv(MODEL_CACHE_ENV)
     if model_cache and config.density.model_cache_dir is None:
@@ -158,28 +134,32 @@ def _execute_pipeline(
     orchestrator = NewsPipelineOrchestrator(config)
     articles = orchestrator.run()
 
-    if limit is not None:
-        articles = articles[:limit]
-
     generated_at = datetime.now(timezone.utc)
     payload = [ArticlePayload(**article) for article in articles]
     return PipelineResponse(generated_at=generated_at, articles=payload)
 
 
-def _load_config(
-    config_upload: Optional[UploadFile], default_config_path: Path
-) -> PipelineConfig:
-    """Load configuration from an upload or fall back to the default file."""
+def _determine_config_path(config_path: Path | str | None) -> Path:
+    """Resolve the configuration path from CLI, module, or environment."""
 
-    if config_upload is not None:
-        content = config_upload.file.read()
-        if not content:
-            raise ValueError("Uploaded configuration file is empty")
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError as exc:  # pragma: no cover - defensive guard
-            raise ValueError("Uploaded configuration must be UTF-8 encoded") from exc
-        return PipelineConfig.from_yaml_string(text)
+    candidates: List[Path] = []
+    if config_path is not None:
+        candidates.append(Path(config_path).expanduser())
+    if _DEFAULT_CONFIG_PATH is not None:
+        candidates.append(_DEFAULT_CONFIG_PATH)
+
+    env_path = os.getenv(DEFAULT_CONFIG_ENV)
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+
+    if not candidates:
+        candidates.append(Path(DEFAULT_CONFIG_FALLBACK).expanduser())
+
+    return candidates[0]
+
+
+def _load_config(default_config_path: Path) -> PipelineConfig:
+    """Load configuration from the default path defined at application startup."""
 
     config_path = _validate_path(default_config_path, "configuration file")
     return PipelineConfig.from_yaml(config_path)
@@ -204,5 +184,6 @@ def _ensure_parent(path: Path) -> Path:
 
 
 __all__ = [
+    "configure_default_config_path",
     "create_app",
 ]
