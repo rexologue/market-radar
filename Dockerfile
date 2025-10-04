@@ -1,5 +1,6 @@
-# syntax=docker/dockerfile:1.5
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -9,14 +10,32 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install OS dependencies required by sentence-transformers and fastapi stack
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y build-essential git \
-    && rm -rf /var/lib/apt/lists/*
+# ---------- Builder stage: prepare wheels ----------
+FROM base AS builder
 
-COPY requirements.txt ./
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /tmp/requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip && \
+    python -m pip wheel --wheel-dir /tmp/wheels -r /tmp/requirements.txt
+
+# ---------- Runtime stage: minimal environment ----------
+FROM base AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /tmp/wheels /tmp/wheels
+COPY requirements.txt /tmp/requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --no-index --find-links=/tmp/wheels -r /tmp/requirements.txt && \
+    rm -rf /tmp/wheels
 
 COPY . .
 
