@@ -1,41 +1,42 @@
 # syntax=docker/dockerfile:1.7
 
-FROM python:3.11-slim AS base
+# Base image with CUDA support
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100
 
 WORKDIR /app
 
-# ---------- Builder stage: prepare wheels ----------
+# ---------- Builder: compile dependency wheels ----------
 FROM base AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential git \
+    git build-essential cmake ninja-build \
  && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /tmp/requirements.txt
+COPY requirements.txt /app/requirements.txt
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip && \
-    python -m pip wheel --wheel-dir /tmp/wheels -r /tmp/requirements.txt
+    python -m pip wheel --wheel-dir=/wheels -r /app/requirements.txt
 
-# ---------- Runtime stage: minimal environment ----------
+# ---------- Runtime: slim environment with CUDA libs ----------
 FROM base AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
+    git libgl1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /tmp/wheels /tmp/wheels
-COPY requirements.txt /tmp/requirements.txt
+COPY --from=builder /wheels /wheels
+COPY requirements.txt /app/requirements.txt
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --no-index --find-links=/tmp/wheels -r /tmp/requirements.txt && \
-    rm -rf /tmp/wheels
+    python -m pip install --no-index --find-links=/wheels -r /app/requirements.txt && \
+    rm -rf /wheels
 
 COPY . .
 
