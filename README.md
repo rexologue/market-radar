@@ -98,28 +98,23 @@ returns the ranked articles as JSON.
 ### Run locally
 
 ```bash
-uvicorn market_radar.api:create_app --factory --host 0.0.0.0 --port 8000
+python -m market_radar --config $(pwd)/config.yaml --port 8000
 ```
 
-Send a request to trigger the pipeline (uploading a custom configuration is optional):
+Send a request to trigger the pipeline:
 
 ```bash
 curl -X POST \
-  -F "config_file=@$(pwd)/config.yaml" \
-  "http://localhost:8000/pipeline?since=6h&limit=10"
+  "http://localhost:8000/pipeline?output_path=$(pwd)/output.json&since=6h"
 ```
 
 Available query parameters:
 
-- `since` – override `time_window.since` (e.g. `6h`).
-- `max_per_source` – limit the number of articles pulled per RSS source.
-- `limit` – trim the number of records returned in the JSON response.
-- `sources_path` – override the RSS sources JSON used by the fetcher.
-- `output_path` – specify a custom location for the generated report on disk.
+- `output_path` – **required**, specifies where the generated JSON report is written.
+- `since` – optional override for `time_window.since` (e.g. `6h`).
 
-If `config_file` is omitted, the API loads the configuration pointed to by
-`MARKET_RADAR_CONFIG` or falls back to `config.example.yaml` and applies the
-query-parameter overrides.
+All other configuration values are sourced exclusively from the YAML file
+provided when the service starts.
 
 Set `MARKET_RADAR_MODEL_CACHE` (or the common `HF_HOME`/`TRANSFORMERS_CACHE`)
 to reuse a persistent cache for Sentence Transformers weights.

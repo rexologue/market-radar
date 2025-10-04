@@ -65,7 +65,6 @@ RUN_ARGS=(
   docker run --rm
   -p "${PORT}:${PORT}"
   -e "PORT=${PORT}"
-  -e "MARKET_RADAR_CONFIG=${CONFIG_PATH_ABS}"
   -e "MARKET_RADAR_MODEL_CACHE=/app/models"
   -e "HF_HOME=/app/models"
   -e "TRANSFORMERS_CACHE=/app/models"
@@ -86,7 +85,7 @@ if [[ ${DEV} -eq 1 ]]; then
   RUN_ARGS+=( -v "$(pwd):/app:ro" )
 fi
 
-RUN_ARGS+=( "${IMAGE_NAME}" )
+RUN_ARGS+=( "${IMAGE_NAME}" "--config" "${CONFIG_PATH_ABS}" )
 
 echo "Executing: ${RUN_ARGS[*]}"
 exec "${RUN_ARGS[@]}"
