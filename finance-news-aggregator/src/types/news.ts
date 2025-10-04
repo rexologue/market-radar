@@ -1,21 +1,14 @@
-export interface NewsSource {
-  id: string;
-  type: string;
-  timezone: string;
-  outfile: string;
-  urls: string[];
-}
-
 export interface NewsItem {
-  id: string;
-  title: string;
-  description: string;
-  link: string;
-  pubDate: string;
   source: string;
-  sourceId: string;
-  timezone: string;
-  imageUrl?: string;
+  source_domain: string;
+  published_at: string;
+  url: string;
+  title: string | null;
+  summary: string;
+  time_coef: number;
+  density_coef: number;
+  domain_coef: number;
+  hotness: number;
 }
 
 export interface TimeFilter {

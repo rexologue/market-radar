@@ -1,9 +1,9 @@
-export const formatDate = (dateString: string): string => {
+export const formatDate = (dateString: string, timezone?: string): string => {
   try {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) {
       const minutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
       return `${minutes} мин. назад`;
@@ -21,11 +21,11 @@ export const formatDate = (dateString: string): string => {
   }
 };
 
-export const getFullDate = (dateString: string, timezone: string): string => {
+export const getFullDate = (dateString: string, timezone?: string): string => {
   try {
     const date = new Date(dateString);
     return date.toLocaleString('ru-RU', {
-      timeZone: timezone,
+      timeZone: timezone || 'Europe/Moscow',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -41,7 +41,7 @@ export const formatTimeFilter = (filter: { value: number; unit: 'h' | 'd' | 'w' 
   const { value, unit } = filter;
 
   if (value === 0) {
-    return 'all';
+    return '24h'; // используем 24 часа вместо 'all'
   }
 
   return `${value}${unit}`;
