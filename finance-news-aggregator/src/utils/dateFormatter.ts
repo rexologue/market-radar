@@ -1,4 +1,4 @@
-export const formatDate = (dateString: string, timezone: string): string => {
+export const formatDate = (dateString: string): string => {
   try {
     const date = new Date(dateString);
     const now = new Date();
@@ -39,26 +39,10 @@ export const getFullDate = (dateString: string, timezone: string): string => {
 
 export const formatTimeFilter = (filter: { value: number; unit: 'h' | 'd' | 'w' }): string => {
   const { value, unit } = filter;
-  
+
   if (value === 0) {
     return 'all';
   }
-  
-  return `${value}${unit}`;
-};
 
-export const parseTimeFilter = (filterString: string): { value: number; unit: 'h' | 'd' | 'w' } => {
-  if (filterString === 'all') {
-    return { value: 0, unit: 'h' };
-  }
-  
-  const match = filterString.match(/^(\d+)([hdw])$/);
-  if (match) {
-    return {
-      value: parseInt(match[1]),
-      unit: match[2] as 'h' | 'd' | 'w'
-    };
-  }
-  
-  return { value: 24, unit: 'h' };
+  return `${value}${unit}`;
 };

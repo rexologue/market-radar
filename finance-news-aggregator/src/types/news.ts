@@ -18,12 +18,6 @@ export interface NewsItem {
   imageUrl?: string;
 }
 
-export interface ApiResponse {
-  success: boolean;
-  data: NewsItem[];
-  error?: string;
-}
-
 export interface TimeFilter {
   value: number;
   unit: 'h' | 'd' | 'w';

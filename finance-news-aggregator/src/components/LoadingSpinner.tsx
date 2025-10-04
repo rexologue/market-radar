@@ -19,7 +19,6 @@ export const LoadingSpinner: React.FC = () => {
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }}
-        className="animate-spin"
       />
       <p style={{ color: '#64748b', fontSize: '16px' }}>Загрузка новостей...</p>
     </div>

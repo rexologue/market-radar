@@ -29,29 +29,10 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ news, loading, error }) => {
         <p style={{
           marginBottom: '20px',
           fontSize: '1rem',
-          lineHeight: '1.5',
-          maxWidth: '600px',
-          margin: '0 auto 20px'
+          lineHeight: '1.5'
         }}>
           {error}
         </p>
-        <div style={{
-          fontSize: '0.9rem',
-          color: 'var(--text-secondary)',
-          backgroundColor: '#fef2f2',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          border: '1px solid #fecaca',
-          maxWidth: '600px',
-          margin: '0 auto'
-        }}>
-          <strong>Возможные причины:</strong>
-          <ul style={{ textAlign: 'left', margin: '8px 0 0 20px' }}>
-            <li>Бэкенд не может получить данные из RSS-источников</li>
-            <li>Проблемы с сетью или доступом к источникам</li>
-            <li>Сервер временно недоступен</li>
-          </ul>
-        </div>
       </div>
     );
   }
@@ -69,7 +50,7 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ news, loading, error }) => {
       }}>
         <h3 style={{ marginBottom: '12px', fontSize: '1.5rem' }}>Новости не найдены</h3>
         <p style={{ fontSize: '1rem' }}>
-          Попробуйте изменить период обновления или повторить попытку позже
+          Попробуйте изменить период обновления
         </p>
       </div>
     );

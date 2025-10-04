@@ -7,12 +7,23 @@ export const Header: React.FC = () => {
       background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
       color: 'white',
       padding: '40px 0',
-      boxShadow: 'var(--shadow)',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
       marginBottom: '32px'
     }}>
-      <div className="container">
-        <div className="header-content">
-          <div className="header-title">
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 40px' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
             <TrendingUp size={40} />
             <h1 style={{
               fontSize: '2.5rem',

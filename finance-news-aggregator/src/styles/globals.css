@@ -117,11 +117,11 @@ input:focus, select:focus {
   .container {
     padding: 0 40px;
   }
-  
+
   .time-filter-grid {
     grid-template-columns: auto 200px 150px auto;
   }
-  
+
   .news-grid {
     grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   }

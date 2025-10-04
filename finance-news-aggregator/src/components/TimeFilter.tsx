@@ -40,11 +40,12 @@ export const TimeFilter: React.FC<TimeFilterProps> = ({
   };
 
   return (
+      <div>
     <div style={{
-      backgroundColor: 'var(--surface-color)',
+      backgroundColor: '#ffffff',
       padding: '24px',
-      borderRadius: 'var(--border-radius)',
-      boxShadow: 'var(--shadow)',
+      borderRadius: '12px',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
       marginBottom: '32px'
     }}>
       <div style={{
@@ -63,12 +64,12 @@ export const TimeFilter: React.FC<TimeFilterProps> = ({
             fontSize: '1.5rem',
             fontWeight: '600',
             margin: 0,
-            color: 'var(--text-primary)'
+            color: '#1e293b'
           }}>
             Период обновления
           </h2>
         </div>
-        
+
         <button
           onClick={onRefresh}
           disabled={loading}
@@ -77,44 +78,41 @@ export const TimeFilter: React.FC<TimeFilterProps> = ({
             alignItems: 'center',
             gap: '8px',
             padding: '10px 20px',
-            backgroundColor: 'var(--primary-color)',
+            backgroundColor: '#2563eb',
             color: 'white',
             border: 'none',
-            borderRadius: 'var(--border-radius)',
+            borderRadius: '12px',
             cursor: loading ? 'not-allowed' : 'pointer',
             fontSize: '14px',
             fontWeight: '500',
-            transition: 'var(--transition)',
+            transition: 'all 0.2s ease-in-out',
             opacity: loading ? 0.6 : 1,
             minWidth: '140px',
             justifyContent: 'center'
           }}
-          onMouseOver={(e) => {
-            if (!loading) {
-              e.currentTarget.style.backgroundColor = 'var(--primary-hover)';
-            }
-          }}
-          onMouseOut={(e) => {
-            if (!loading) {
-              e.currentTarget.style.backgroundColor = 'var(--primary-color)';
-            }
-          }}
         >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={16} style={{
+            animation: loading ? 'spin 1s linear infinite' : 'none'
+          }} />
           {loading ? 'Обновление...' : 'Обновить'}
         </button>
       </div>
-
-      <div className="time-filter-grid">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto 200px 150px auto',
+        gap: '16px',
+        alignItems: 'center',
+        marginBottom: '16px'
+      }}>
         <label style={{
           fontWeight: '600',
-          color: 'var(--text-primary)',
+          color: '#1e293b',
           whiteSpace: 'nowrap',
           fontSize: '16px'
         }}>
           Показать новости за:
         </label>
-        
+
         <input
           type="number"
           value={timeFilter.value === 0 ? '' : timeFilter.value}
@@ -123,25 +121,25 @@ export const TimeFilter: React.FC<TimeFilterProps> = ({
           min="0"
           style={{
             padding: '12px 16px',
-            border: '2px solid var(--border-color)',
-            borderRadius: 'var(--border-radius)',
+            border: '2px solid #e2e8f0',
+            borderRadius: '12px',
             fontSize: '16px',
-            transition: 'var(--transition)',
+            transition: 'all 0.2s ease-in-out',
             width: '100%'
           }}
         />
-        
+
         <select
           value={timeFilter.unit}
           onChange={handleUnitChange}
           style={{
             padding: '12px 16px',
-            border: '2px solid var(--border-color)',
-            borderRadius: 'var(--border-radius)',
+            border: '2px solid #e2e8f0',
+            borderRadius: '12px',
             fontSize: '16px',
-            backgroundColor: 'var(--surface-color)',
+            backgroundColor: '#ffffff',
             cursor: 'pointer',
-            transition: 'var(--transition)',
+            transition: 'all 0.2s ease-in-out',
             width: '100%'
           }}
         >
@@ -149,33 +147,21 @@ export const TimeFilter: React.FC<TimeFilterProps> = ({
           <option value="d">дней</option>
           <option value="w">недель</option>
         </select>
-        
+
         <button
           onClick={handleSetAllTime}
           style={{
             padding: '12px 20px',
-            backgroundColor: timeFilter.value === 0 ? 'var(--primary-color)' : 'transparent',
-            color: timeFilter.value === 0 ? 'white' : 'var(--primary-color)',
-            border: `2px solid ${timeFilter.value === 0 ? 'var(--primary-color)' : 'var(--border-color)'}`,
-            borderRadius: 'var(--border-radius)',
+            backgroundColor: timeFilter.value === 0 ? '#2563eb' : 'transparent',
+            color: timeFilter.value === 0 ? 'white' : '#2563eb',
+            border: `2px solid ${timeFilter.value === 0 ? '#2563eb' : '#e2e8f0'}`,
+            borderRadius: '12px',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: '500',
-            transition: 'var(--transition)',
+            transition: 'all 0.2s ease-in-out',
             whiteSpace: 'nowrap',
             width: '100%'
-          }}
-          onMouseOver={(e) => {
-            if (timeFilter.value !== 0) {
-              e.currentTarget.style.backgroundColor = 'var(--primary-color)';
-              e.currentTarget.style.color = 'white';
-            }
-          }}
-          onMouseOut={(e) => {
-            if (timeFilter.value !== 0) {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--primary-color)';
-            }
           }}
         >
           Все время
@@ -193,6 +179,16 @@ export const TimeFilter: React.FC<TimeFilterProps> = ({
       }}>
         <strong>Текущий период:</strong> {getDisplayText()}
       </div>
+
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </div>
+      </div>
   );
 };
