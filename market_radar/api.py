@@ -28,8 +28,14 @@ class ArticlePayload(BaseModel):
     source_domain: str = Field(..., description="Domain extracted from the source URL")
     published_at: str = Field(..., description="UTC ISO timestamp of publication")
     url: str = Field(..., description="Canonical article URL")
-    title: str = Field(..., description="Article title")
-    summary: str = Field(..., description="LLM-generated or heuristic summary")
+    title: Optional[str] = Field(
+        None,
+        description="Article title (may be missing from some feeds)",
+    )
+    summary: Optional[str] = Field(
+        None,
+        description="LLM-generated or heuristic summary (may be unavailable)",
+    )
     time_coef: float = Field(..., description="Normalised time coefficient")
     density_coef: float = Field(..., description="Normalised density coefficient")
     domain_coef: float = Field(..., description="Domain/category weight")
