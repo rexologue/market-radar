@@ -1,22 +1,42 @@
-# syntax=docker/dockerfile:1.5
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.7
+
+# Base image with CUDA support
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100
 
 WORKDIR /app
 
-# Install OS dependencies required by sentence-transformers and fastapi stack
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y build-essential git \
-    && rm -rf /var/lib/apt/lists/*
+# ---------- Builder: compile dependency wheels ----------
+FROM base AS builder
 
-COPY requirements.txt ./
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git build-essential cmake ninja-build \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /app/requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip && \
+    python -m pip wheel --wheel-dir=/wheels -r /app/requirements.txt
+
+# ---------- Runtime: slim environment with CUDA libs ----------
+FROM base AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git libgl1 libglib2.0-0 \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /wheels /wheels
+COPY requirements.txt /app/requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --no-index --find-links=/wheels -r /app/requirements.txt && \
+    rm -rf /wheels
 
 COPY . .
 
