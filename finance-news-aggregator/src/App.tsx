@@ -47,7 +47,7 @@ function App() {
             color: 'var(--text-secondary)'
           }}>
             <p style={{ marginBottom: '8px' }}>
-              © 2024 Finance News Aggregator
+              © 2025 AsequasyOFF
             </p>
             <p style={{ fontSize: '0.875rem' }}>
               Агрегатор финансовых новостей из проверенных источников
