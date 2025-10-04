@@ -138,6 +138,15 @@ class PipelineConfig:
             raise ValueError("YAML config must contain a mapping at the root")
         return cls.from_dict(data)
 
+    @classmethod
+    def from_yaml_string(cls, content: str) -> "PipelineConfig":
+        """Load configuration from a raw YAML string."""
+
+        data = yaml.safe_load(content)
+        if not isinstance(data, dict):
+            raise ValueError("YAML config must contain a mapping at the root")
+        return cls.from_dict(data)
+
 
 __all__ = [
     "PipelineConfig",

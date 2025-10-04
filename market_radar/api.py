@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,7 @@ from .config import PipelineConfig
 from .orchestrator import NewsPipelineOrchestrator
 
 DEFAULT_CONFIG_ENV = "MARKET_RADAR_CONFIG"
+DEFAULT_CONFIG_FALLBACK = "config.example.yaml"
 MODEL_CACHE_ENV = "MARKET_RADAR_MODEL_CACHE"
 
 
@@ -43,7 +44,9 @@ class PipelineResponse(BaseModel):
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
-    default_config_path = os.getenv(DEFAULT_CONFIG_ENV, "config.yaml")
+    default_config_path = Path(
+        os.getenv(DEFAULT_CONFIG_ENV, DEFAULT_CONFIG_FALLBACK)
+    ).expanduser()
 
     app = FastAPI(
         title="Market Radar API",
@@ -60,15 +63,18 @@ def create_app() -> FastAPI:
 
         return {"status": "ok"}
 
-    @app.get(
+    @app.post(
         "/pipeline",
         summary="Run the Market Radar pipeline",
         response_model=PipelineResponse,
     )
     async def run_pipeline(
-        config_path: Optional[str] = Query(
+        config_file: Optional[UploadFile] = File(
             None,
-            description="Path to the YAML configuration (defaults to MARKET_RADAR_CONFIG or config.yaml)",
+            description=(
+                "Upload a YAML configuration file. When omitted the default "
+                "config.example.yaml (or MARKET_RADAR_CONFIG) is used."
+            ),
         ),
         since: Optional[str] = Query(
             None,
@@ -98,7 +104,8 @@ def create_app() -> FastAPI:
         try:
             response = await run_in_threadpool(
                 _execute_pipeline,
-                config_path or default_config_path,
+                config_file,
+                default_config_path,
                 since,
                 max_per_source,
                 limit,
@@ -118,7 +125,8 @@ def create_app() -> FastAPI:
 
 
 def _execute_pipeline(
-    config_path_str: str,
+    config_upload: Optional[UploadFile],
+    default_config_path: Path,
     since: Optional[str],
     max_per_source: Optional[int],
     limit: Optional[int],
@@ -127,8 +135,7 @@ def _execute_pipeline(
 ) -> PipelineResponse:
     """Load configuration, apply overrides, and run the pipeline synchronously."""
 
-    config_path = _validate_path(config_path_str, "configuration file")
-    config = PipelineConfig.from_yaml(config_path)
+    config = _load_config(config_upload, default_config_path)
 
     if since:
         config.time_window.since = since
@@ -159,10 +166,29 @@ def _execute_pipeline(
     return PipelineResponse(generated_at=generated_at, articles=payload)
 
 
-def _validate_path(path_str: str, label: str, *, must_exist: bool = True) -> Path:
+def _load_config(
+    config_upload: Optional[UploadFile], default_config_path: Path
+) -> PipelineConfig:
+    """Load configuration from an upload or fall back to the default file."""
+
+    if config_upload is not None:
+        content = config_upload.file.read()
+        if not content:
+            raise ValueError("Uploaded configuration file is empty")
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError as exc:  # pragma: no cover - defensive guard
+            raise ValueError("Uploaded configuration must be UTF-8 encoded") from exc
+        return PipelineConfig.from_yaml_string(text)
+
+    config_path = _validate_path(default_config_path, "configuration file")
+    return PipelineConfig.from_yaml(config_path)
+
+
+def _validate_path(path_input: Path | str, label: str, *, must_exist: bool = True) -> Path:
     """Validate and normalise file paths coming from the request."""
 
-    path = Path(path_str).expanduser()
+    path = Path(path_input).expanduser()
     if not path.is_absolute():
         path = path.resolve()
     if must_exist and not path.exists():
