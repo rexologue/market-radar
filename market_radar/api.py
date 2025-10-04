@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
 
 from .config import PipelineConfig
 from .orchestrator import NewsPipelineOrchestrator
@@ -19,34 +18,6 @@ DEFAULT_CONFIG_FALLBACK = "config.example.yaml"
 MODEL_CACHE_ENV = "MARKET_RADAR_MODEL_CACHE"
 
 _DEFAULT_CONFIG_PATH: Path | None = None
-
-
-class ArticlePayload(BaseModel):
-    """Schema returned for every ranked article."""
-
-    source: str = Field(..., description="Identifier of the RSS source")
-    source_domain: str = Field(..., description="Domain extracted from the source URL")
-    published_at: str = Field(..., description="UTC ISO timestamp of publication")
-    url: str = Field(..., description="Canonical article URL")
-    title: Optional[str] = Field(
-        None,
-        description="Article title (may be missing from some feeds)",
-    )
-    summary: Optional[str] = Field(
-        None,
-        description="LLM-generated or heuristic summary (may be unavailable)",
-    )
-    time_coef: float = Field(..., description="Normalised time coefficient")
-    density_coef: float = Field(..., description="Normalised density coefficient")
-    domain_coef: float = Field(..., description="Domain/category weight")
-    hotness: float = Field(..., description="Final hotness score in [0, 1]")
-
-
-class PipelineResponse(BaseModel):
-    """Response returned by the pipeline endpoint."""
-
-    generated_at: datetime = Field(..., description="UTC timestamp when the run completed")
-    articles: List[ArticlePayload] = Field(..., description="Ranked articles with coefficients")
 
 
 def configure_default_config_path(path: Path | str) -> None:
@@ -66,7 +37,7 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
         version="1.0.0",
         description=(
             "HTTP wrapper for the Market Radar pipeline. Runtime overrides are limited "
-            "to the 'since' window and required output destination."
+            "to the 'since' window while responses return the generated JSON file."
         ),
     )
 
@@ -79,26 +50,21 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
     @app.post(
         "/pipeline",
         summary="Run the Market Radar pipeline",
-        response_model=PipelineResponse,
+        response_class=FileResponse,
     )
     async def run_pipeline(
         since: Optional[str] = Query(
             None,
             description="Override the time window 'since' value, e.g. '6h'",
         ),
-        output_path: str = Query(
-            ...,
-            description="Destination JSON file written by the pipeline",
-        ),
-    ) -> PipelineResponse:
-        """Execute the pipeline with optional overrides and return the ranked articles."""
+    ) -> FileResponse:
+        """Execute the pipeline with optional overrides and return the output file."""
 
         try:
             response = await run_in_threadpool(
                 _execute_pipeline,
                 default_config_path,
                 since,
-                output_path,
             )
         except FileNotFoundError as exc:  # pragma: no cover - simple mapping
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -107,7 +73,11 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
         except Exception as exc:  # pragma: no cover - defensive catch-all
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-        return response
+        return FileResponse(
+            response,
+            media_type="application/json",
+            filename=response.name,
+        )
 
     return app
 
@@ -115,8 +85,7 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
 def _execute_pipeline(
     default_config_path: Path,
     since: Optional[str],
-    output_path: str,
-) -> PipelineResponse:
+) -> Path:
     """Load configuration, apply overrides, and run the pipeline synchronously."""
 
     config = _load_config(default_config_path)
@@ -124,12 +93,7 @@ def _execute_pipeline(
     if since:
         config.time_window.since = since
 
-    if not output_path:
-        raise ValueError("The 'output_path' query parameter is required")
-
-    config.output.path = _ensure_parent(
-        _validate_path(output_path, "output file", must_exist=False)
-    )
+    config.output.path = _ensure_parent(_resolve_output_path(config, default_config_path))
 
     model_cache = os.getenv(MODEL_CACHE_ENV)
     if model_cache and config.density.model_cache_dir is None:
@@ -138,11 +102,9 @@ def _execute_pipeline(
         config.density.model_cache_dir = cache_dir
 
     orchestrator = NewsPipelineOrchestrator(config)
-    articles = orchestrator.run()
+    orchestrator.run()
 
-    generated_at = datetime.now(timezone.utc)
-    payload = [ArticlePayload(**article) for article in articles]
-    return PipelineResponse(generated_at=generated_at, articles=payload)
+    return config.output.path
 
 
 def _determine_config_path(config_path: Path | str | None) -> Path:
@@ -169,6 +131,15 @@ def _load_config(default_config_path: Path) -> PipelineConfig:
 
     config_path = _validate_path(default_config_path, "configuration file")
     return PipelineConfig.from_yaml(config_path)
+
+
+def _resolve_output_path(config: PipelineConfig, default_config_path: Path) -> Path:
+    """Resolve the output path defined in the configuration file."""
+
+    output_path = config.output.path
+    if not output_path.is_absolute():
+        output_path = (default_config_path.parent / output_path).resolve()
+    return output_path
 
 
 def _validate_path(path_input: Path | str, label: str, *, must_exist: bool = True) -> Path:
