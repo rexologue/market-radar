@@ -105,12 +105,13 @@ Send a request to trigger the pipeline:
 
 ```bash
 curl -X POST \
-  "http://localhost:8000/pipeline?output_path=$(pwd)/output.json&since=6h"
+  "http://localhost:8000/pipeline?&since=6h" \
+  --output output.json
 ```
 
 Available query parameters:
 
-- `output_path` – **required**, specifies where the generated JSON report is written.
+- `--output` – **required**, specifies where the generated JSON report is written.
 - `since` – optional override for `time_window.since` (e.g. `6h`).
 
 All other configuration values are sourced exclusively from the YAML file
